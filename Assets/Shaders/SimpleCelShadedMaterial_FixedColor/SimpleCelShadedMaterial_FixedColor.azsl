@@ -174,21 +174,6 @@ ForwardPassOutput MinimalPBR_MainPassPS(VSOutput IN)
 
     PbrLightingOutput lightingOutput = GetPbrLightingOutput(surface, lightingData, alpha);
 
-    // [begin[modified_code[engine]]] Opt out of the post-forward-pass fullscreen lighting features, as they would be
-    // adding additional, smooth lighting on top of our clean, cel-shaded results.
-    // TODO: Replace this code with setting the actual shader options instead of trying to undo their affects here.
-    {
-        // Disable IBL specular features.
-        const bool overwrite_enableIBL = false;
-
-        // Disable dynamic reflection features.
-        const bool overwrite_specularF0_enableMultiScatterCompensation = false;
-
-        // These bools are encoded into the normal's alpha channel. See `StandardLighting.azsli` and `ReflectionGlobalFullscreen.azsl`.
-        lightingOutput.m_normal.a = EncodeUnorm2BitFlags(overwrite_enableIBL, overwrite_specularF0_enableMultiScatterCompensation);
-    }
-    // [end[modified_code[engine]]]
-
     // ------- Output -------
 
     ForwardPassOutput OUT;

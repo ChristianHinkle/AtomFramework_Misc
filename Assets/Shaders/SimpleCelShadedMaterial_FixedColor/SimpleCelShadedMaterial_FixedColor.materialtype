@@ -85,6 +85,30 @@
                         "type": "ShaderInput",
                         "id": "m_roughness"
                     }
+                },
+                // Set shader options via hidden material properties. Opt out of the post-forward-pass fullscreen lighting features, as they would be
+                // adding additional, smooth lighting on top of our clean, cel-shaded results.
+                {
+                    // Disable IBL specular features.
+                    "name": "enableIBL",
+                    "type": "Bool",
+                    "defaultValue": false,
+                    "visibility": "Hidden",
+                    "connection": {
+                        "type": "ShaderOption",
+                        "name": "o_enableIBL"
+                    }
+                },
+                {
+                    // Disable dynamic reflection features.
+                    "name": "enableMultiScatterCompensation",
+                    "type": "Bool",
+                    "defaultValue": false,
+                    "visibility": "Hidden",
+                    "connection": {
+                        "type": "ShaderOption",
+                        "name": "o_specularF0_enableMultiScatterCompensation"
+                    }
                 }
             ]
         }
