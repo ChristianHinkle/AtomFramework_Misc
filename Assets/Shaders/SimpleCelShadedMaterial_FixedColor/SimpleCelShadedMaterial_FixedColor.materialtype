@@ -1,0 +1,103 @@
+{
+    "description": "An example PBR cel shader material which doesn't support light colors, only predefined lit, unlit, and specular colors.",
+    "version": 1,
+    "propertyLayout": {
+        "groups": [
+            {
+                "id": "settings",
+                "displayName": "Settings"
+            }
+        ],
+        "properties": {
+            "settings": [
+                {
+                    "id": "litColor",
+                    "displayName": "Lit Color",
+                    "type": "Color",
+                    "defaultValue": [0.75, 0.75, 0.75],
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_litColor"
+                    }
+                },
+                {
+                    "id": "unlitColor",
+                    "displayName": "Unlit Color",
+                    "type": "Color",
+                    "defaultValue": [0.25, 0.25, 0.25],
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_unlitColor"
+                    }
+                },
+                {
+                    "id": "specularColor",
+                    "displayName": "Specular Color",
+                    "type": "Color",
+                    "defaultValue": [1.0, 1.0, 1.0],
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_specularColor"
+                    }
+                },
+                {
+                    "id": "diffuseThreshold",
+                    "displayName": "Diffuse Threshold",
+                    "type": "float",
+                    "defaultValue": 0.5,
+                    "min": 0.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_diffuseThreshold"
+                    }
+                },
+                {
+                    "id": "specularThreshold",
+                    "displayName": "Specular Threshold",
+                    "type": "float",
+                    "defaultValue": 0.5,
+                    "min": 0.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_specularThreshold"
+                    }
+                },
+                {
+                    "id": "metallic",
+                    "displayName": "Metallic",
+                    "type": "float",
+                    "defaultValue": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_metallic"
+                    }
+                },
+                {
+                    "id": "roughness",
+                    "displayName": "Roughness",
+                    "type": "float",
+                    "defaultValue": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_roughness"
+                    }
+                }
+            ]
+        }
+    },
+    "shaders": [
+        {
+            "file": "./SimpleCelShadedMaterial_FixedColor.shader"
+        },
+        {
+            "file": "Shaders/Depth/DepthPass.shader"
+        },
+        {
+            "file": "Shaders/Shadow/Shadowmap.shader"
+        }
+    ]
+}

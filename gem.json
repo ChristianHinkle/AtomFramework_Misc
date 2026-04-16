@@ -21,7 +21,8 @@
     "requirements": "",
     "documentation_url": "",
     "dependencies": [
-        "CppUtils"
+        "CppUtils",
+        "AtomUtils_Core"
     ],
     "repo_uri": "",
     "compatible_engines": [

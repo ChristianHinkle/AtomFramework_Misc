@@ -1,0 +1,204 @@
+#pragma once
+
+// [begin[modified_code[engine]]] Enable IBL lighting to be calculated directly in this forward pass fragment shader, so that
+// we can apply cel shading to its results as well.
+#define FORCE_IBL_IN_FORWARD_PASS 1
+// [end[modified_code[engine]]]
+#define FORCE_OPAQUE 1
+
+#include <scenesrg_all.srgi>
+#include <viewsrg_all.srgi>
+#include <Atom/Features/PBR/DefaultObjectSrg.azsli>
+#include <Atom/RPI/ShaderResourceGroups/DefaultDrawSrg.azsli>
+#include <Atom/Features/InstancedTransforms.azsli>
+#include <Atom/Features/PBR/DefaultObjectSrg.azsli>
+#include <Atom/Features/Pipeline/Forward/ForwardPassSrg.azsli>
+#include <Atom/Features/Pipeline/Forward/ForwardPassOutput.azsli>
+#include <Atom/Features/SrgSemantics.azsli>
+#include <Atom/Features/ColorManagement/TransformColor.azsli>
+// [begin[modified_code[engine]]] Use our "_Customizable" version of the engine's `StandardLighting.azsli`. As well as include our "_LightingBrdf" file before doing so.
+#include "./SimpleCelShadedMaterial_FixedColor_LightingBrdf.azsli"
+#include <AtomUtils/Core/PBR/Lighting/StandardLighting_Customizable.azsli>
+// [end[modified_code[engine]]]
+#include <Atom/Features/PBR/Lights/IblForward.azsli>
+#include <Atom/Features/PBR/Decals.azsli>
+
+// [begin[modified_code[engine]]]
+#include <Atom/Features/PostProcessing/PostProcessUtil.azsli>
+// [end[modified_code[engine]]]
+
+ShaderResourceGroup MinimalPBRSrg : SRG_PerMaterial
+{
+    // [begin[modified_code[engine]]] Replace `m_baseColor` with lit, unlit, and specular colors, and add cel shade variables.
+    float3 m_litColor;
+    float3 m_unlitColor;
+    float3 m_specularColor;
+    float m_diffuseThreshold;
+    float m_specularThreshold;
+    // [end[modified_code[engine]]]
+    float m_metallic;
+    float m_roughness;
+}
+
+struct VSInput
+{
+    float3 m_position : POSITION;
+    float3 m_normal : NORMAL;
+    float4 m_tangent : TANGENT;
+};
+
+struct VSOutput
+{
+    precise linear centroid float4 m_position : SV_Position;
+    float3 m_normal: NORMAL;
+    float4 m_tangent : TANGENT;
+    float3 m_worldPosition : UV0;
+    uint m_instanceId : SV_InstanceID;
+};
+
+VSOutput MinimalPBR_MainPassVS(VSInput IN, uint instanceId : SV_InstanceID)
+{
+    VSOutput OUT;
+    OUT.m_instanceId = instanceId;
+    float3 worldPosition = mul(GetObjectToWorldMatrix(instanceId), float4(IN.m_position, 1.0)).xyz;
+
+    OUT.m_worldPosition = worldPosition;
+    OUT.m_position = mul(ViewSrg::m_viewProjectionMatrix, float4(OUT.m_worldPosition, 1.0));
+    OUT.m_normal = IN.m_normal;
+    OUT.m_tangent = IN.m_tangent;
+
+    return OUT;
+}
+
+ForwardPassOutput MinimalPBR_MainPassPS(VSOutput IN)
+{
+    float3 views[MAX_SHADING_VIEWS];
+    views[0] = ViewSrg::m_worldPosition.xyz;    // Assume one view for forward pass for now
+
+    real4x4 objectToWorld = real4x4(GetObjectToWorldMatrix(IN.m_instanceId));
+    real3x3 objectToWorldIT = real3x3(GetObjectToWorldMatrixInverseTranspose(IN.m_instanceId));
+
+    float3 normalWS, tangentWS, bitangentWS;
+    ConstructTBN(real3(IN.m_normal), real4(IN.m_tangent), objectToWorld, objectToWorldIT, normalWS, tangentWS, bitangentWS);
+
+    // ------- Surface -------
+
+    Surface surface;
+
+    // Position, Normal, Roughness
+    surface.position = IN.m_worldPosition.xyz;
+    surface.normal = normalWS;
+    surface.vertexNormal = normalWS;
+    surface.roughnessLinear = MinimalPBRSrg::m_roughness;
+    surface.CalculateRoughnessA();
+
+    // Albedo, SpecularF0
+    // [begin[modified_code[engine]]] Use our `m_litColor` for base color.
+    float3 baseColor = MinimalPBRSrg::m_litColor;
+    // [end[modified_code[engine]]]
+    float metallic = MinimalPBRSrg::m_metallic;
+    float specularF0Factor = 0.5f;
+    surface.SetAlbedoAndSpecularF0(baseColor, specularF0Factor, metallic);
+    // [begin[modified_code[engine]]] Use a pure white albedo so that we get pure lighting calculations, and then we'll restore the actual base color value afterward.
+    surface.albedo = 1;
+    // [end[modified_code[engine]]]
+
+    // Clear Coat
+    surface.clearCoat.InitializeToZero();
+
+    // [begin[modified_code[engine]]] Initialize lighting channel mask with the values configured by the object.
+    surface.lightingChannels = ObjectSrg::m_lightingChannelMask;
+    // [end[modified_code[engine]]]
+
+    // ------- Light culling iterator -----
+
+    LightCullingTileIterator tileIterator;
+    tileIterator.Init(IN.m_position, PassSrg::m_lightListRemapped, PassSrg::m_tileLightData);
+
+    // ------- LightingData -------
+
+    LightingData lightingData;
+    lightingData.Init(surface.position, surface.normal, surface.roughnessLinear, views);
+
+
+    // Diffuse and Specular response
+    lightingData.specularResponse = FresnelSchlickWithRoughness(lightingData.GetSpecularNdotV(), surface.specularF0, surface.roughnessLinear);
+    lightingData.diffuseResponse = 1.0f - lightingData.specularResponse;
+
+    const float alpha = 1.0f;
+
+    // ------- Lighting Calculation -------
+
+    // Apply Decals
+    ApplyDecals(tileIterator, surface);
+
+    // Apply Direct Lighting
+    ApplyDirectLighting(surface, lightingData, IN.m_position, tileIterator);
+
+    // Apply Image Based Lighting (IBL)
+    ApplyIblForward(surface, lightingData);
+
+    // [begin[modified_code[engine]]]
+
+    // Apply cel shading to diffuse.
+    {
+        // Note: This implementation of banding disregards any color data. We purely look at the total luminance of
+        // all color channels to determine "how lit" this fragment it.
+        real luminance = GetLuminance(lightingData.diffuseLighting);
+        real celFactor = step(MinimalPBRSrg::m_diffuseThreshold, luminance);
+
+        lightingData.diffuseLighting = lerp(MinimalPBRSrg::m_unlitColor, MinimalPBRSrg::m_litColor, celFactor);
+    }
+
+    // Apply cel shading to specular.
+    {
+        [unroll]
+        for (uint i = 0; i < MAX_SHADING_VIEWS; ++i)
+        {
+            // Note: This implementation of banding disregards any color data. We purely look at the total luminance of
+            // all color channels to determine "how lit" this fragment it.
+            real luminance = GetLuminance(lightingData.specularLighting[i]);
+            real celFactor = step(MinimalPBRSrg::m_specularThreshold, luminance);
+
+            lightingData.specularLighting[i] = celFactor * MinimalPBRSrg::m_specularColor;
+        }
+    }
+
+    // Restore the actual base color value now that the lighting calculations are done.
+    surface.albedo = baseColor;
+
+    // [end[modified_code[engine]]]
+
+    // Finalize Lighting
+    lightingData.FinalizeLighting();
+
+    PbrLightingOutput lightingOutput = GetPbrLightingOutput(surface, lightingData, alpha);
+
+    // [begin[modified_code[engine]]] Opt out of the post-forward-pass fullscreen lighting features, as they would be
+    // adding additional, smooth lighting on top of our clean, cel-shaded results.
+    // TODO: Replace this code with setting the actual shader options instead of trying to undo their affects here.
+    {
+        // Disable IBL specular features.
+        const bool overwrite_enableIBL = false;
+
+        // Disable dynamic reflection features.
+        const bool overwrite_specularF0_enableMultiScatterCompensation = false;
+
+        // These bools are encoded into the normal's alpha channel. See `StandardLighting.azsli` and `ReflectionGlobalFullscreen.azsl`.
+        lightingOutput.m_normal.a = EncodeUnorm2BitFlags(overwrite_enableIBL, overwrite_specularF0_enableMultiScatterCompensation);
+    }
+    // [end[modified_code[engine]]]
+
+    // ------- Output -------
+
+    ForwardPassOutput OUT;
+
+    OUT.m_diffuseColor = lightingOutput.m_diffuseColor;
+    OUT.m_diffuseColor.w = -1; // Subsurface scattering is disabled
+    OUT.m_specularColor = lightingOutput.m_specularColor;
+    OUT.m_specularF0 = lightingOutput.m_specularF0;
+    OUT.m_albedo = lightingOutput.m_albedo;
+    OUT.m_normal = lightingOutput.m_normal;
+
+    return OUT;
+}
