@@ -86,6 +86,15 @@
                         "id": "m_roughness"
                     }
                 },
+                {
+                    "name": "enableShadows",
+                    "type": "Bool",
+                    "defaultValue": false,
+                    "connection": {
+                        "type": "ShaderOption",
+                        "name": "o_enableShadows"
+                    }
+                },
                 // Set shader options via hidden material properties. Opt out of the post-forward-pass fullscreen lighting features, as they would be
                 // adding additional, smooth lighting on top of our clean, cel-shaded results.
                 {
