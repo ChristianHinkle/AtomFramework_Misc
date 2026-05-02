@@ -1,0 +1,140 @@
+{
+    "description": "An example PBR cel shader material which is implemented via custom BRDF functions (supporting colored light sources).",
+    "version": 1,
+    "propertyLayout": {
+        "groups": [
+            {
+                "id": "settings",
+                "displayName": "Settings"
+            }
+        ],
+        "properties": {
+            "settings": [
+                {
+                    "id": "m_diffuseStepResolution",
+                    "displayName": "Diffuse Step Resolution",
+                    "type": "float",
+                    "defaultValue": 2.0,
+                    "min": 0.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_diffuseStepResolution"
+                    }
+                },
+                {
+                    "id": "m_diffuseStepRoundingBias",
+                    "displayName": "Diffuse Step Rounding Bias",
+                    "type": "float",
+                    "defaultValue": 0.499,
+                    "min": 0.0,
+                    "max": 0.499,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_diffuseStepRoundingBias"
+                    }
+                },
+                {
+                    "id": "m_specularStepResolution",
+                    "displayName": "Specular Step Resolution",
+                    "type": "float",
+                    "defaultValue": 2.0,
+                    "min": 0.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_specularStepResolution"
+                    }
+                },
+                {
+                    "id": "m_specularStepRoundingBias",
+                    "displayName": "Specular Step Rounding Bias",
+                    "type": "float",
+                    "defaultValue": 0.499,
+                    "min": 0.0,
+                    "max": 0.499,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_specularStepRoundingBias"
+                    }
+                },
+                {
+                    "id": "baseColor",
+                    "displayName": "Base Color",
+                    "type": "Color",
+                    "defaultValue": [1.0, 1.0, 1.0],
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_baseColor"
+                    }
+                },
+                {
+                    "id": "metallic",
+                    "displayName": "Metallic",
+                    "type": "float",
+                    "defaultValue": 0.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_metallic"
+                    }
+                },
+                {
+                    "id": "roughness",
+                    "displayName": "Roughness",
+                    "type": "float",
+                    "defaultValue": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "connection": {
+                        "type": "ShaderInput",
+                        "id": "m_roughness"
+                    }
+                },
+                {
+                    "name": "enableShadows",
+                    "type": "Bool",
+                    "defaultValue": false,
+                    "connection": {
+                        "type": "ShaderOption",
+                        "name": "o_enableShadows"
+                    }
+                },
+                // Set shader options via hidden material properties. Opt out of the post-forward-pass fullscreen lighting features, as they would be
+                // adding additional, smooth lighting on top of our clean, cel-shaded results.
+                {
+                    // Disable IBL specular features.
+                    "name": "enableIBL",
+                    "type": "Bool",
+                    "defaultValue": false,
+                    "visibility": "Hidden",
+                    "connection": {
+                        "type": "ShaderOption",
+                        "name": "o_enableIBL"
+                    }
+                },
+                {
+                    // Disable dynamic reflection features.
+                    "name": "enableMultiScatterCompensation",
+                    "type": "Bool",
+                    "defaultValue": false,
+                    "visibility": "Hidden",
+                    "connection": {
+                        "type": "ShaderOption",
+                        "name": "o_specularF0_enableMultiScatterCompensation"
+                    }
+                }
+            ]
+        }
+    },
+    "shaders": [
+        {
+            "file": "./SimpleCelShadedMaterial_RoundedBrdf.shader"
+        },
+        {
+            "file": "Shaders/Depth/DepthPass.shader"
+        },
+        {
+            "file": "Shaders/Shadow/Shadowmap.shader"
+        }
+    ]
+}

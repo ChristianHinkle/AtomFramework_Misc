@@ -1,0 +1,41 @@
+
+#pragma once
+
+#include <AtomUtils/Core/PBR/Lighting/StandardLighting_Brdf.azsli>
+
+#include <Atom/Features/PBR/Lighting/LightingData.azsli>
+#include <Atom/Features/PBR/Surfaces/StandardSurface.azsli>
+
+// Override the diffuse/specular function macros. Must be defined before including the light type files (via Lights.azsli).
+
+#define GetDiffuseLighting(surface, lightingData, lightIntensity, dirToLight) \
+    GetDiffuseLighting_ExampleCustom(surface, lightingData, lightIntensity, dirToLight)
+
+#define GetSpecularLighting(surface, lightingData, lightIntensity, dirToLight, viewIndex) \
+    GetSpecularLighting_ExampleCustom(surface, lightingData, lightIntensity, dirToLight, viewIndex)
+
+real3 GetDiffuseLighting_ExampleCustom(Surface surface, LightingData lightingData, real3 lightIntensity, real3 dirToLight)
+{
+    real3 result = GetDiffuseLighting_StandardLighting(surface, lightingData, lightIntensity, dirToLight);
+
+    // Round the lighting result to create cel shaded bands.
+    result *= MinimalPBRSrg::m_diffuseStepResolution;
+    result += MinimalPBRSrg::m_diffuseStepRoundingBias;
+    result = real3(int3(result));
+    result /= MinimalPBRSrg::m_diffuseStepResolution;
+
+    return result;
+}
+
+real3 GetSpecularLighting_ExampleCustom(Surface surface, LightingData lightingData, const real3 lightIntensity, const real3 dirToLight, uint viewIndex)
+{
+    real3 result = GetSpecularLighting_StandardLighting(surface, lightingData, lightIntensity, dirToLight, viewIndex);
+
+    // Round the lighting result to create cel shaded bands.
+    result *= MinimalPBRSrg::m_specularStepResolution;
+    result += MinimalPBRSrg::m_specularStepRoundingBias;
+    result = real3(int3(result));
+    result /= MinimalPBRSrg::m_specularStepResolution;
+
+    return result;
+}
